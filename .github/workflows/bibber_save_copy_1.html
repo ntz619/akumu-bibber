@@ -78,29 +78,6 @@
     a { color: var(--accent); text-decoration: none; }
     .hitpad { pointer-events: all; }
 
-    /* ===== Editor panel & edit mode ===== */
-    .pos-panel { position: fixed; right: 12px; top: 76px; bottom: 12px; z-index: 20; pointer-events: auto; background: rgba(20,24,32,0.96); border: 1px solid rgba(148,163,184,0.25); border-radius: 12px; padding: 10px; width: min(340px, calc(100vw - 24px)); color: var(--ink); box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-size: 12px; display: none; overflow: auto; overscroll-behavior: contain; }
-    body.editing .pos-panel { display: block; }
-    .pos-panel h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .3px; }
-    .pos-group { margin-bottom: 10px; }
-    .pos-group h4 { margin: 8px 0; font-size: 12px; font-weight: 800; color: #cbd5e1; letter-spacing: .3px; }
-    .pos-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .pos-row input, .pos-row select, .pos-row textarea { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.25); background: #0e121a; color: var(--ink); font: inherit; }
-    .pos-nudges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
-    .pos-nudges .nudge { padding: 6px 0; border-radius: 8px; border: 1px solid rgba(148,163,184,0.25); background: #1a2030; color: #e2e8f0; font-weight: 700; cursor: pointer; }
-    .pos-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-    .pos-sep { height: 1px; background: rgba(148,163,184,0.18); margin: 10px 0; }
-    #posOut { margin-top: 8px; height: 120px; resize: vertical; }
-    .pos-mini { font-size: 11px; color: var(--muted); margin-top: 6px; }
-
-    /* Visual cues in edit mode */
-    body.editing .lane { stroke-dasharray: 8 10; opacity: 0.7; }
-    body.editing .tray { cursor: move; outline: 2px dashed rgba(148,163,184,0.35); }
-
-    /* Push board left when editing to avoid overlap on wide screens */
-    @media (min-width: 1024px) {
-      body.editing .board-wrap { margin-right: 360px; }
-    }
   </style>
 </head>
 <body>
@@ -115,7 +92,6 @@
         <span class="muted">Removed</span>
         <strong id="progress">0/8</strong>
       </div>
-      <button class="btn" id="editToggle" type="button" aria-pressed="false" title="Toggle edit mode (E)">Edit</button>
       <button class="btn" id="resetBtn" type="button" title="Restart the game (R)">Reset</button>
     </div>
   </header>
@@ -157,120 +133,14 @@
     </div>
   </main>
 
-  <!-- ===== Editor Panel (outside the canvas) ===== -->
-  <div class="pos-panel" id="posPanel" role="group" aria-label="Editor">
-    <h3>Editor</h3>
-
-    <div class="pos-group">
-      <div class="pos-row">
-        <label for="posOrganSelect">Item / Lane</label>
-        <select id="posOrganSelect"></select>
-      </div>
-    </div>
-
-    <div class="pos-group" id="startGroup">
-      <h4>Start position</h4>
-      <div class="pos-row"><label for="posX">Start&nbsp;X</label><input id="posX" type="number" step="1" min="0" max="800" /></div>
-      <div class="pos-nudges" data-kind="start" data-axis="x">
-        <button class="nudge" data-delta="-10">X −10</button>
-        <button class="nudge" data-delta="-1">X −1</button>
-        <button class="nudge" data-delta="1">X +1</button>
-        <button class="nudge" data-delta="10">X +10</button>
-      </div>
-      <div class="pos-row" style="margin-top:8px"><label for="posY">Start&nbsp;Y</label><input id="posY" type="number" step="1" min="0" max="600" /></div>
-      <div class="pos-nudges" data-kind="start" data-axis="y">
-        <button class="nudge" data-delta="-10">Y −10</button>
-        <button class="nudge" data-delta="-1">Y −1</button>
-        <button class="nudge" data-delta="1">Y +1</button>
-        <button class="nudge" data-delta="10">Y +10</button>
-      </div>
-    </div>
-
-    <div class="pos-group" id="trayGroup">
-      <h4>Tray position</h4>
-      <div class="pos-row"><label for="trayX">Tray&nbsp;X</label><input id="trayX" type="number" step="1" min="0" max="800" /></div>
-      <div class="pos-nudges" data-kind="tray" data-axis="x">
-        <button class="nudge" data-delta="-10">X −10</button>
-        <button class="nudge" data-delta="-1">X −1</button>
-        <button class="nudge" data-delta="1">X +1</button>
-        <button class="nudge" data-delta="10">X +10</button>
-      </div>
-      <div class="pos-row" style="margin-top:8px"><label for="trayY">Tray&nbsp;Y</label><input id="trayY" type="number" step="1" min="0" max="600" /></div>
-      <div class="pos-nudges" data-kind="tray" data-axis="y">
-        <button class="nudge" data-delta="-10">Y −10</button>
-        <button class="nudge" data-delta="-1">Y −1</button>
-        <button class="nudge" data-delta="1">Y +1</button>
-        <button class="nudge" data-delta="10">Y +10</button>
-      </div>
-    </div>
-
-    <div class="pos-group" id="laneGroup">
-      <h4>Lane behaviour</h4>
-      <div class="pos-row"><label for="laneAmp">Amplitude</label><input id="laneAmp" type="number" step="1" /></div>
-      <div class="pos-row"><label for="laneMid">Mid shift</label><input id="laneMid" type="number" step="1" /></div>
-      <div class="pos-row">
-        <label>Signs</label>
-        <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:6px;">
-          <select id="sign1"><option value="1">+1</option><option value="-1">-1</option></select>
-          <select id="sign2"><option value="1">+1</option><option value="-1">-1</option></select>
-          <select id="sign3"><option value="1">+1</option><option value="-1">-1</option></select>
-        </div>
-      </div>
-    </div>
-
-    <div class="pos-group" id="scaleGroup">
-      <h4>Organ scale & rotation</h4>
-      <div class="pos-row"><label for="scaleIdle">Idle scale</label><input id="scaleIdle" type="number" step="0.1" min="0.2" max="6" /></div>
-      <div class="pos-nudges" data-kind="scaleIdle">
-        <button class="nudge" data-delta="-0.5">−0.5</button>
-        <button class="nudge" data-delta="-0.1">−0.1</button>
-        <button class="nudge" data-delta="0.1">+0.1</button>
-        <button class="nudge" data-delta="0.5">+0.5</button>
-      </div>
-      <div class="pos-row" style="margin-top:8px"><label for="scaleGrab">Grab scale</label><input id="scaleGrab" type="number" step="0.1" min="0.2" max="6" /></div>
-      <div class="pos-nudges" data-kind="scaleGrab">
-        <button class="nudge" data-delta="-0.5">−0.5</button>
-        <button class="nudge" data-delta="-0.1">−0.1</button>
-        <button class="nudge" data-delta="0.1">+0.1</button>
-        <button class="nudge" data-delta="0.5">+0.5</button>
-      </div>
-      <div class="pos-row" style="margin-top:8px"><label for="rotDeg">Rotation (deg)</label><input id="rotDeg" type="number" step="1" min="-180" max="180" /></div>
-      <div class="pos-nudges" data-kind="rot">
-        <button class="nudge" data-delta="-15">−15°</button>
-        <button class="nudge" data-delta="-1">−1°</button>
-        <button class="nudge" data-delta="1">+1°</button>
-        <button class="nudge" data-delta="15">+15°</button>
-      </div>
-    </div>
-
-    <div class="pos-sep"></div>
-
-    <div class="pos-group">
-      <h4>Body image</h4>
-      <div class="pos-row"><label for="imgUrl">URL</label><input id="imgUrl" type="url" placeholder="https://example.com/body.png" /></div>
-      <div class="pos-row"><label for="imgFit">Fit</label><select id="imgFit"><option value="cover">Cover</option><option value="contain">Contain</option></select></div>
-      <div class="pos-row"><label for="imgOpacity">Opacity</label><input id="imgOpacity" type="range" min="0" max="1" step="0.05" value="0.85" /></div>
-    </div>
-
-    <div class="pos-actions">
-      <button id="applyAll" class="btn" type="button" title="Apply and rebuild">Apply</button>
-      <button id="copyAll" class="btn" type="button" title="Copy full JSON config">Copy JSON</button>
-    </div>
-    <textarea id="posOut" readonly></textarea>
-    <div class="pos-mini">Tip: Toggle <strong>Edit</strong> (E) to drag trays & items directly. While editing, gameplay is paused.</div>
-  </div>
-  <!-- ===== End Editor Panel ===== -->
-
   <footer>
     Built with plain HTML, SVG and JavaScript. No libraries needed. Press <strong>R</strong> to restart.
   </footer>
 
   <script>
-  // ======== OPERATION-STYLE GAME + Advanced Editor ==========
+  // ======== OPERATION-STYLE GAME ==========
   const GAME = { lives: 3, removed: 0, total: 8, active: true, allowExtra: 2 };
-  const EDIT = { enabled:false };
 
-  // Organs. startY is optional; if missing, it will be auto-arranged once, then editable.
   const ORGANS = [
     { id: 'heart',   label: 'HEART',   side: 'left',  startX: 419, startY: 225 },
     { id: 'bone',    label: 'BONE',    side: 'left',  startX: 279, startY: 304 },
@@ -284,11 +154,9 @@
 
   const EMOJI = { heart:'💔', bone:'🦴', brain:'🔑', stomach:'🥄', lung:'🫁', kidney:'🫘', tooth:'🦴', liver:'🦴' };
 
-  // Tray positions (center points)
   const TRAY_X = { heart:75, bone:75, brain:75, stomach:75, lung:700, kidney:700, tooth:700, liver:700 };
   const TRAY_Y = { heart:55, bone:392, brain:185, stomach:528, lung:55, kidney:185, tooth:528, liver:392 };
 
-  // Lane behaviour
   const AMP       = { heart:32, bone:23, brain:28, stomach:36, lung:34, kidney:30, tooth:26, liver:38 };
   const MID_SHIFT = { heart:-18, bone:-27, brain:7, stomach:20, lung:14, kidney:-22, tooth:24, liver:-12 };
   const SIGNS     = {
@@ -302,16 +170,13 @@
     liver:[ -1, -1, -1],
   };
 
-  // Per-organ emoji scaling + rotation
   const SCALES = {
     heart:{ idle:1, grab:0.5, rot:0 }, bone:{ idle:1.2, grab:0.5, rot:-26 }, brain:{ idle:1, grab:0.5, rot:140 }, stomach:{ idle:1, grab:0.5, rot:-60 },
     lung:{ idle:1, grab:0.5, rot:0 }, kidney:{ idle:1, grab:0.5, rot:0 }, tooth:{ idle:1.3, grab:0.5, rot:-66 }, liver:{ idle:1.2, grab:0.5, rot:-36 },
   };
 
-  // Body image config
   const BODY_IMAGE = { url: 'https://assetz.nyc3.cdn.digitaloceanspaces.com/Scapelz%20&%20Scandalz/dragonbody.png', fit: 'contain', opacity: 0.85 };
 
-  // DOM refs
   const svg = document.getElementById('board');
   const bodyImg = document.getElementById('bodyImage');
   const bodyGroup = document.getElementById('body');
@@ -323,54 +188,80 @@
   const livesEl  = document.getElementById('lives');
   const progressEl = document.getElementById('progress');
   const resetBtn = document.getElementById('resetBtn');
-  const editToggle = document.getElementById('editToggle');
 
-  // Editor DOM
-  const posPanel = document.getElementById('posPanel');
-  const posSel   = document.getElementById('posOrganSelect');
-  const posXIn   = document.getElementById('posX');
-  const posYIn   = document.getElementById('posY');
-  const trayXIn  = document.getElementById('trayX');
-  const trayYIn  = document.getElementById('trayY');
-  const laneAmpIn= document.getElementById('laneAmp');
-  const laneMidIn= document.getElementById('laneMid');
-  const sign1Sel = document.getElementById('sign1');
-  const sign2Sel = document.getElementById('sign2');
-  const sign3Sel = document.getElementById('sign3');
-  const scaleIdleIn = document.getElementById('scaleIdle');
-  const scaleGrabIn = document.getElementById('scaleGrab');
-  const rotDegIn = document.getElementById('rotDeg');
-  const applyAll = document.getElementById('applyAll');
-  const copyAll  = document.getElementById('copyAll');
-  const posOut   = document.getElementById('posOut');
+  function el(name, attrs = {}, children = []) {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (const [key, value] of Object.entries(attrs)) {
+      node.setAttribute(key, value);
+    }
+    for (const child of children) {
+      node.appendChild(child);
+    }
+    return node;
+  }
 
-  // Image editor DOM
-  const imgUrlIn = document.getElementById('imgUrl');
-  const imgFitIn = document.getElementById('imgFit');
-  const imgOpacityIn = document.getElementById('imgOpacity');
+  function setLives(n){
+    livesEl.innerHTML='';
+    for(let i=0;i<3;i++){
+      const span=document.createElement('span');
+      span.className='life-heart';
+      span.textContent= i<n?'❤':'♡';
+      span.style.fontSize='18px';
+      if(i>=n) span.style.color='rgba(255,255,255,0.35)';
+      livesEl.appendChild(span);
+    }
+  }
 
-  // Utils
-  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  function clampScale(s){ return clamp(parseFloat(s||0), 0.2, 6); }
-  function clampAngle(a){ let x=parseFloat(a||0); if(!isFinite(x)) x=0; // wrap to [-180,180]
-    x = ((x + 180) % 360 + 360) % 360 - 180; return x; }
-  function el(name, attrs = {}, children = []) { const n = document.createElementNS('http://www.w3.org/2000/svg', name); for (const [k,v] of Object.entries(attrs)) n.setAttribute(k,v); for (const c of children) n.appendChild(c); return n; }
-  function setLives(n){ livesEl.innerHTML=''; for(let i=0;i<3;i++){ const s=document.createElement('span'); s.className='life-heart'; s.textContent= i<n?'❤':'♡'; s.style.fontSize='18px'; if(i>=n) s.style.color='rgba(255,255,255,0.35)'; livesEl.appendChild(s);} }
-  function updateProgress(){ progressEl.textContent = `${GAME.removed}/${GAME.total}`; if(GAME.removed===GAME.total){ GAME.active=false; overlay.textContent='You win! 🎉'; overlay.classList.add('show'); } }
-  function gameOver(){ GAME.active=false; overlay.textContent='Game Over'; overlay.classList.add('show'); }
-  function buzzBoard(){ svg.classList.remove('hit'); void svg.offsetWidth; svg.classList.add('hit'); }
+  function updateProgress(){
+    progressEl.textContent = `${GAME.removed}/${GAME.total}`;
+    if(GAME.removed===GAME.total){
+      GAME.active=false;
+      overlay.textContent='You win! 🎉';
+      overlay.classList.add('show');
+    }
+  }
 
-  // Layout: if startY is missing, auto-assign once.
-  function getLaneStrokeWidth(){ const css=getComputedStyle(document.documentElement).getPropertyValue('--lane-width'); const v=parseFloat(css); return isNaN(v)?12:v; }
-  function layoutIfNeeded(){ const H=600; const minY=50, maxY=H-50; const gap=(maxY-minY)/(ORGANS.length-1); ORGANS.forEach((o,i)=>{ if(o.startY==null||Number.isNaN(o.startY)) o.startY = Math.round(minY+i*gap); }); return gap; }
+  function gameOver(){
+    GAME.active=false;
+    overlay.textContent='Game Over';
+    overlay.classList.add('show');
+  }
 
-  // Paths
-  const PATHS = {}; let BAND_GAP=0;
+  function buzzBoard(){
+    svg.classList.remove('hit');
+    void svg.offsetWidth;
+    svg.classList.add('hit');
+  }
+
+  function getLaneStrokeWidth(){
+    const css=getComputedStyle(document.documentElement).getPropertyValue('--lane-width');
+    const value=parseFloat(css);
+    return isNaN(value)?12:value;
+  }
+
+  function layoutIfNeeded(){
+    const H=600;
+    const minY=50, maxY=H-50;
+    const gap=(maxY-minY)/(ORGANS.length-1);
+    ORGANS.forEach((o,i)=>{
+      if(o.startY==null||Number.isNaN(o.startY)){
+        o.startY = Math.round(minY+i*gap);
+      }
+    });
+    return gap;
+  }
+
+  const PATHS = {};
+  let BAND_GAP=0;
+
   function makeWavyPath(o){
     const start={ x:o.startX, y:o.startY };
     const end  ={ x: TRAY_X[o.id], y: (TRAY_Y[o.id]??o.startY) };
-    const s = SIGNS[o.id]; let amp = AMP[o.id];
-    const half = getLaneStrokeWidth()/2 + GAME.allowExtra; const maxSafe = Math.max(8,(BAND_GAP/2)-half-8); amp=Math.min(amp,maxSafe);
+    const s = SIGNS[o.id];
+    let amp = AMP[o.id];
+    const half = getLaneStrokeWidth()/2 + GAME.allowExtra;
+    const maxSafe = Math.max(8,(BAND_GAP/2)-half-8);
+    amp=Math.min(amp,maxSafe);
     const xm1 = o.side==='left'? start.x-160 : start.x+160;
     const xm2 = (start.x+end.x)/2 + MID_SHIFT[o.id];
     const xm3 = o.side==='left'? end.x+140 : end.x-140;
@@ -382,20 +273,26 @@
     return { d, end };
   }
 
-  // Build
   function build(){
-    lanesG.innerHTML=''; traysG.innerHTML=''; pocketsG.innerHTML=''; organsG.innerHTML='';
+    lanesG.innerHTML='';
+    traysG.innerHTML='';
+    pocketsG.innerHTML='';
+    organsG.innerHTML='';
+
     BAND_GAP = layoutIfNeeded();
+    GAME.total = ORGANS.length;
 
     ORGANS.forEach((o,idx)=>{
       const { d, end } = makeWavyPath(o);
       const color = ['#ef4444','#f59e0b','#10b981','#06b6d4','#8b5cf6','#e11d48','#22c55e','#f97316'][idx % 8];
       const guide = el('path', { d, class:'lane-guide', stroke:color, 'stroke-opacity':'0.35' });
       const lane  = el('path', { d, class:'lane', id:`lane-${o.id}`, stroke:color });
-      lanesG.appendChild(guide); lanesG.appendChild(lane);
+      lanesG.appendChild(guide);
+      lanesG.appendChild(lane);
       PATHS[o.id] = { d, end, el: lane };
 
-      const trayW=54, trayH=28; const rect=el('rect',{ id:`tray-${o.id}`, 'data-id':o.id, x:end.x-trayW/2, y:end.y-trayH/2, width:trayW, height:trayH, class:'tray' });
+      const trayW=54, trayH=28;
+      const rect=el('rect',{ id:`tray-${o.id}`, 'data-id':o.id, x:end.x-trayW/2, y:end.y-trayH/2, width:trayW, height:trayH, class:'tray' });
       traysG.appendChild(rect);
       traysG.appendChild(el('text',{ x:end.x-trayW/2+11, y:end.y+4, class:'tray-label' },[document.createTextNode('TRAY')]));
 
@@ -408,97 +305,50 @@
       const em  = el('text',{ x:0, y:0, 'text-anchor':'middle', 'alignment-baseline':'middle', 'dominant-baseline':'central', class:'organ-emoji' },[document.createTextNode(EMOJI[o.id]||'🔹')]);
       const sc = SCALES[o.id]||{idle:3,grab:1,rot:0};
       em.setAttribute('style', `--idle-scale:${sc.idle}; --grab-scale:${sc.grab}; --rot:${(sc.rot||0)}deg;`);
-      g.appendChild(hit); g.appendChild(em); organsG.appendChild(g);
+      g.appendChild(hit);
+      g.appendChild(em);
+      organsG.appendChild(g);
     }
 
-    setLives(GAME.lives); updateProgress();
+    setLives(GAME.lives);
+    updateProgress();
     renderBodyImage();
   }
 
-  // Hit testing: exact stroke
-  function getLaneHalfWidth(){ const anyLane=document.querySelector('.lane'); const sw = anyLane?parseFloat(getComputedStyle(anyLane).strokeWidth):getLaneStrokeWidth(); return (isNaN(sw)?getLaneStrokeWidth():sw)/2 + GAME.allowExtra; }
-  function isOnLane(id,x,y){ const lane=PATHS[id]?.el; if(!lane) return false; if(typeof lane.isPointInStroke==='function'){ const pt=svg.createSVGPoint(); pt.x=x; pt.y=y; return lane.isPointInStroke(pt);} const half=getLaneHalfWidth(); const len=lane.getTotalLength(); const steps=Math.max(100,Math.floor(len/5)); for(let i=0;i<=steps;i++){ const p=lane.getPointAtLength((i/steps)*len); const dx=p.x-x, dy=p.y-y; if(dx*dx+dy*dy<=half*half) return true; } return false; }
-
-  // Drag
-  let drag=null;
-  function onPointerDown(e){
-    const item = e.target.closest('.organ, .tray');
-    if(!item) return;
-
-    // EDIT MODE: pick up items or trays for repositioning; gameplay paused
-    if(EDIT.enabled){
-      const isOrgan = item.classList.contains('organ');
-      const id = item.getAttribute('data-id');
-      drag = { type: isOrgan ? 'organEdit' : 'trayEdit', id, el: item };
-      item.setPointerCapture?.(e.pointerId);
-      e.preventDefault();
-      return;
-    }
-
-    // GAME MODE
-    if(!GAME.active) return;
-    const t=e.target.closest('.organ');
-    if(!t) return;
-    const id=t.getAttribute('data-id');
-    drag={ organId:id, el:t };
-    t.classList.add('grabbing');
-    t.setPointerCapture(e.pointerId);
-    e.preventDefault();
+  function getLaneHalfWidth(){
+    const anyLane=document.querySelector('.lane');
+    const sw = anyLane?parseFloat(getComputedStyle(anyLane).strokeWidth):getLaneStrokeWidth();
+    return (isNaN(sw)?getLaneStrokeWidth():sw)/2 + GAME.allowExtra;
   }
 
-  function onPointerMove(e){
-    if(!drag) return;
-    const pt=clientToSvgPoint(e.clientX,e.clientY);
-
-    // EDIT MODE behaviour
-    if(EDIT.enabled){
-      if(drag.type==='organEdit'){
-        drag.el.setAttribute('transform',`translate(${pt.x}, ${pt.y})`);
-        drag.x=pt.x; drag.y=pt.y;
-      } else if(drag.type==='trayEdit'){
-        const w=parseFloat(drag.el.getAttribute('width')), h=parseFloat(drag.el.getAttribute('height'));
-        drag.el.setAttribute('x', pt.x - w/2);
-        drag.el.setAttribute('y', pt.y - h/2);
-        drag.x=pt.x; drag.y=pt.y;
-      }
-      return;
+  function isOnLane(id,x,y){
+    const lane=PATHS[id]?.el;
+    if(!lane) return false;
+    if(typeof lane.isPointInStroke==='function'){
+      const pt=svg.createSVGPoint();
+      pt.x=x;
+      pt.y=y;
+      return lane.isPointInStroke(pt);
     }
-
-    // GAME MODE behaviour
-    if(!GAME.active) return;
-    const x=pt.x,y=pt.y;
-    drag.el.setAttribute('transform',`translate(${x}, ${y})`);
-    if(!isOnLane(drag.organId,x,y)){ loseLifeAndReset(drag.organId); return; }
-    const end=PATHS[drag.organId].end; const dx=x-end.x, dy=y-end.y; if(dx*dx+dy*dy<18*18){ completeOrgan(drag.organId); return; }
+    const half=getLaneHalfWidth();
+    const len=lane.getTotalLength();
+    const steps=Math.max(100,Math.floor(len/5));
+    for(let i=0;i<=steps;i++){
+      const p=lane.getPointAtLength((i/steps)*len);
+      const dx=p.x-x, dy=p.y-y;
+      if(dx*dx+dy*dy<=half*half) return true;
+    }
+    return false;
   }
 
-  function onPointerUp(){
-    if(!drag) return;
-
-    // EDIT MODE: commit changes
-    if(EDIT.enabled){
-      if(drag.type==='organEdit'){
-        const o=ORGANS.find(x=>x.id===drag.id); if(o){ o.startX = clamp(drag.x||o.startX,0,800); o.startY = clamp(drag.y||o.startY,0,600); }
-      } else if(drag.type==='trayEdit'){
-        const id = drag.id; if(TRAY_X[id]!=null){ TRAY_X[id] = clamp(drag.x||TRAY_X[id],0,800); } if(TRAY_Y[id]!=null){ TRAY_Y[id] = clamp(drag.y||TRAY_Y[id],0,600); }
-      }
-      drag=null; build(); loadEditorFields(); updateExportPreview();
-      return;
-    }
-
-    // GAME MODE: drop back to start
-    const id=drag.organId; const o=ORGANS.find(x=>x.id===id);
-    drag.el.classList.remove('grabbing');
-    drag.el.setAttribute('transform',`translate(${o.startX}, ${o.startY})`);
-    drag=null;
+  function clientToSvgPoint(clientX,clientY){
+    const pt=svg.createSVGPoint();
+    pt.x=clientX;
+    pt.y=clientY;
+    const inv=svg.getScreenCTM().inverse();
+    return pt.matrixTransform(inv);
   }
 
-  function loseLifeAndReset(id){ if(!GAME.active) return; GAME.lives-=1; setLives(GAME.lives); buzzBoard(); const o=ORGANS.find(x=>x.id===id); const g=document.getElementById(`org-${id}`); if(g){ g.classList.remove('grabbing'); g.setAttribute('transform',`translate(${o.startX}, ${o.startY})`); } drag=null; if(GAME.lives<=0) gameOver(); }
-  function completeOrgan(id){ const g=document.getElementById(`org-${id}`); if(!g) return; g.classList.remove('grabbing'); g.style.transition='opacity 220ms ease, transform 200ms ease'; g.style.opacity='0'; const end=PATHS[id].end; g.setAttribute('transform',`translate(${end.x}, ${end.y})`); g.style.pointerEvents='none'; GAME.removed+=1; updateProgress(); drag=null; }
-
-  function clientToSvgPoint(clientX,clientY){ const pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY; const inv=svg.getScreenCTM().inverse(); return pt.matrixTransform(inv); }
-
-  // ===== Body image =====
   function renderBodyImage(){
     const has = !!(BODY_IMAGE.url && BODY_IMAGE.url.trim());
     if(has){
@@ -515,78 +365,86 @@
     }
   }
 
-  // ===== Editor Logic =====
-  function populateOrganSelect(){ posSel.innerHTML=''; for(const o of ORGANS){ const opt=document.createElement('option'); opt.value=o.id; opt.textContent=`${o.label||o.id}`; posSel.appendChild(opt); } }
-  function getCurrentOrgan(){ return ORGANS.find(x=>x.id===posSel.value); }
-  function loadEditorFields(){ const o=getCurrentOrgan(); if(!o) return; posXIn.value = Math.round(o.startX); posYIn.value = Math.round(o.startY); trayXIn.value = Math.round(TRAY_X[o.id]); trayYIn.value = Math.round(TRAY_Y[o.id]); laneAmpIn.value = AMP[o.id]; laneMidIn.value = MID_SHIFT[o.id]; const s = SIGNS[o.id]; sign1Sel.value=String(s[0]); sign2Sel.value=String(s[1]); sign3Sel.value=String(s[2]); const sc=SCALES[o.id]||{idle:3,grab:1,rot:0}; scaleIdleIn.value=sc.idle; scaleGrabIn.value=sc.grab; rotDegIn.value=sc.rot||0; imgUrlIn.value = BODY_IMAGE.url || ''; imgFitIn.value = BODY_IMAGE.fit; imgOpacityIn.value = BODY_IMAGE.opacity; }
+  let drag=null;
 
-  function applyAllChanges(){ const o=getCurrentOrgan(); if(!o) return; o.startX = clamp(parseFloat(posXIn.value||o.startX),0,800); o.startY = clamp(parseFloat(posYIn.value||o.startY),0,600); TRAY_X[o.id] = clamp(parseFloat(trayXIn.value||TRAY_X[o.id]),0,800); TRAY_Y[o.id] = clamp(parseFloat(trayYIn.value||TRAY_Y[o.id]),0,600); AMP[o.id] = parseFloat(laneAmpIn.value||AMP[o.id]); MID_SHIFT[o.id] = parseFloat(laneMidIn.value||MID_SHIFT[o.id]); SIGNS[o.id] = [parseInt(sign1Sel.value), parseInt(sign2Sel.value), parseInt(sign3Sel.value)]; const idle=clampScale(scaleIdleIn.value); const grab=clampScale(scaleGrabIn.value); const rot=clampAngle(rotDegIn.value); SCALES[o.id] = { idle, grab, rot }; BODY_IMAGE.url=(imgUrlIn.value||'').trim(); BODY_IMAGE.fit=imgFitIn.value; BODY_IMAGE.opacity=parseFloat(imgOpacityIn.value||BODY_IMAGE.opacity)||0.85; build(); updateExportPreview(); highlight(`org-${o.id}`); }
-
-  function highlight(elId){ const g=document.getElementById(elId); if(!g) return; g.style.transformOrigin='center'; g.style.transition='transform 120ms ease'; g.style.transform='scale(1.1)'; setTimeout(()=>{ g.style.transform=''; },140); }
-
-  // Nudge delegation for start/tray/scale/rotation groups
-  posPanel.addEventListener('click', (e)=>{
-    const b=e.target.closest('.nudge'); if(!b) return;
-    const parent=b.parentElement; const kind=parent.getAttribute('data-kind'); const d=parseFloat(b.getAttribute('data-delta'));
-    const o=getCurrentOrgan(); if(!o) return;
-    if(kind==='start'){
-      if(parent.getAttribute('data-axis')==='x'){ o.startX = clamp((o.startX||0)+d,0,800); posXIn.value=Math.round(o.startX); }
-      else { o.startY = clamp((o.startY||0)+d,0,600); posYIn.value=Math.round(o.startY); }
-      build(); highlight(`org-${o.id}`);
-    } else if(kind==='tray'){
-      if(parent.getAttribute('data-axis')==='x'){ TRAY_X[o.id] = clamp((TRAY_X[o.id]||0)+d,0,800); trayXIn.value=Math.round(TRAY_X[o.id]); }
-      else { TRAY_Y[o.id] = clamp((TRAY_Y[o.id]||0)+d,0,600); trayYIn.value=Math.round(TRAY_Y[o.id]); }
-      build(); highlight(`tray-${o.id}`);
-    } else if(kind==='scaleIdle' || kind==='scaleGrab' || kind==='rot'){
-      const sc=SCALES[o.id]||{idle:3,grab:1,rot:0};
-      if(kind==='scaleIdle'){ sc.idle = clampScale((sc.idle||3)+d); scaleIdleIn.value=sc.idle; }
-      else if(kind==='scaleGrab'){ sc.grab = clampScale((sc.grab||1)+d); scaleGrabIn.value=sc.grab; }
-      else { sc.rot = clampAngle((sc.rot||0)+d); rotDegIn.value=sc.rot; }
-      SCALES[o.id]=sc;
-      // Update DOM without full rebuild if possible
-      const emoji = document.querySelector(`#org-${o.id} .organ-emoji`);
-      if(emoji){ emoji.style.setProperty('--idle-scale', sc.idle); emoji.style.setProperty('--grab-scale', sc.grab); emoji.style.setProperty('--rot', sc.rot + 'deg'); }
-    }
-    updateExportPreview();
-  });
-
-  // Apply / Copy
-  applyAll.addEventListener('click', applyAllChanges);
-  copyAll.addEventListener('click', ()=>{ const json=JSON.stringify(getExportObject(),null,2); posOut.value=json; try{ navigator.clipboard.writeText(json); toast('Config copied!'); }catch{ toast('JSON ready below'); } });
-
-  // Selection change
-  posSel.addEventListener('change', loadEditorFields);
-
-  // Live changes on input
-  [posXIn,posYIn,trayXIn,trayYIn,laneAmpIn,laneMidIn,sign1Sel,sign2Sel,sign3Sel,scaleIdleIn,scaleGrabIn,rotDegIn].forEach(el=>{
-    el.addEventListener('change', applyAllChanges);
-  });
-
-  // Body image live controls
-  [imgUrlIn,imgFitIn].forEach(el=> el.addEventListener('change', ()=>{ BODY_IMAGE.url=(imgUrlIn.value||'').trim(); BODY_IMAGE.fit=imgFitIn.value; renderBodyImage(); updateExportPreview(); }));
-  imgOpacityIn.addEventListener('input', ()=>{ BODY_IMAGE.opacity=parseFloat(imgOpacityIn.value)||0.85; renderBodyImage(); updateExportPreview(); });
-
-  // Toggle edit mode
-  function setEditMode(on){ EDIT.enabled=!!on; document.body.classList.toggle('editing', EDIT.enabled); editToggle.setAttribute('aria-pressed', String(EDIT.enabled)); editToggle.textContent = EDIT.enabled ? 'Editing…' : 'Edit'; toast(EDIT.enabled? 'Edit mode ON' : 'Edit mode OFF'); }
-  editToggle.addEventListener('click', ()=> setEditMode(!EDIT.enabled));
-  window.addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='e'){ setEditMode(!EDIT.enabled); } });
-
-  // Export
-  function getExportObject(){
-    const positions={}; const trays={}; const lanes={}; const scales={};
-    for(const o of ORGANS){ const sc=SCALES[o.id]||{idle:3,grab:1,rot:0}; positions[o.id]={ startX: Math.round(o.startX), startY: Math.round(o.startY) }; trays[o.id]={ x: Math.round(TRAY_X[o.id]), y: Math.round(TRAY_Y[o.id]) }; lanes[o.id]={ amp: AMP[o.id], midShift: MID_SHIFT[o.id], signs: SIGNS[o.id].slice() }; scales[o.id]={ idle: sc.idle, grab: sc.grab, rot: sc.rot||0 }; }
-    const out={ positions, trays, lanes, scales };
-    if(BODY_IMAGE.url){ out.bodyImage = { url: BODY_IMAGE.url, fit: BODY_IMAGE.fit, opacity: BODY_IMAGE.opacity }; }
-    return out;
+  function onPointerDown(e){
+    if(!GAME.active) return;
+    const organ = e.target.closest('.organ');
+    if(!organ) return;
+    const id=organ.getAttribute('data-id');
+    drag={ organId:id, el:organ };
+    organ.classList.add('grabbing');
+    organ.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
   }
-  function updateExportPreview(){ posOut.value = JSON.stringify(getExportObject(),null,2); }
 
-  function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.querySelector('.board-wrap').appendChild(t); setTimeout(()=>t.remove(), 1200); }
+  function onPointerMove(e){
+    if(!drag || !GAME.active) return;
+    const pt=clientToSvgPoint(e.clientX,e.clientY);
+    const x=pt.x, y=pt.y;
+    drag.el.setAttribute('transform',`translate(${x}, ${y})`);
+    if(!isOnLane(drag.organId,x,y)){
+      loseLifeAndReset(drag.organId);
+      return;
+    }
+    const end=PATHS[drag.organId].end;
+    const dx=x-end.x, dy=y-end.y;
+    if(dx*dx+dy*dy<18*18){
+      completeOrgan(drag.organId);
+    }
+  }
 
-  // Reset/init
-  function reset(){ GAME.lives=3; GAME.removed=0; GAME.active=true; overlay.classList.remove('show'); overlay.textContent=''; build(); }
+  function onPointerUp(){
+    if(!drag) return;
+    const id=drag.organId;
+    const organ=ORGANS.find(x=>x.id===id);
+    if(organ){
+      drag.el.classList.remove('grabbing');
+      drag.el.setAttribute('transform',`translate(${organ.startX}, ${organ.startY})`);
+    }
+    drag=null;
+  }
 
-  // Bind board
+  function loseLifeAndReset(id){
+    if(!GAME.active) return;
+    GAME.lives-=1;
+    setLives(GAME.lives);
+    buzzBoard();
+    const organ=ORGANS.find(x=>x.id===id);
+    const g=document.getElementById(`org-${id}`);
+    if(organ && g){
+      g.classList.remove('grabbing');
+      g.setAttribute('transform',`translate(${organ.startX}, ${organ.startY})`);
+    }
+    drag=null;
+    if(GAME.lives<=0){
+      gameOver();
+    }
+  }
+
+  function completeOrgan(id){
+    const g=document.getElementById(`org-${id}`);
+    if(!g) return;
+    g.classList.remove('grabbing');
+    g.style.transition='opacity 220ms ease, transform 200ms ease';
+    const end=PATHS[id].end;
+    g.setAttribute('transform',`translate(${end.x}, ${end.y})`);
+    g.style.opacity='0';
+    g.style.pointerEvents='none';
+    GAME.removed+=1;
+    updateProgress();
+    drag=null;
+  }
+
+  function reset(){
+    GAME.lives=3;
+    GAME.removed=0;
+    GAME.active=true;
+    overlay.classList.remove('show');
+    overlay.textContent='';
+    build();
+  }
+
   svg.addEventListener('pointerdown', onPointerDown);
   svg.addEventListener('pointermove', onPointerMove);
   svg.addEventListener('pointerup', onPointerUp);
@@ -594,8 +452,13 @@
   resetBtn.addEventListener('click', reset);
   window.addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='r') reset(); });
 
-  // Bootstrap
-  try{ build(); populateOrganSelect(); posSel.value = ORGANS[0].id; loadEditorFields(); updateExportPreview(); }catch(err){ console.error(err); overlay.textContent='Init error: '+err.message; overlay.classList.add('show'); }
-</script>
+  try{
+    build();
+  }catch(err){
+    console.error(err);
+    overlay.textContent='Init error: '+err.message;
+    overlay.classList.add('show');
+  }
+  </script>
 </body>
 </html>
