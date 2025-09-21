@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scapelz & Scandalz</title>
+  <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+  <style>
+    :root {
+      --bg: #0e1014;
+      --panel: #141820;
+      --panel-2: #1c2230;
+      --ink: #e7ecf3;
+      --muted: #a7b1c2;
+      --accent: #64d2ff;
+      --accent-2: #7ef7c1;
+      --danger: #ff4d6d;
+      --lane: #94a3b8; /* visible lane color */
+      --lane-width: 14; /* px — visual lane width ONLY, collision is separate now */
+      --lane-glow: 0 0 0 4px rgba(100,210,255,0.15), 0 0 0 10px rgba(126,247,193,0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 50% -40%, #121623 0%, var(--bg) 60%);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+    }
+
+    /* Hide the entire game UI when menu is open */
+    body.menu-open header,
+    body.menu-open main,
+    body.menu-open footer { display: none !important; }
+
+    /* Page background image layer (menu only) */
+    #pageBg { position: fixed; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; opacity: 0.24; pointer-events: none; z-index: 40; display:none; }
+
+    header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.0)); border-bottom: 1px solid rgba(148,163,184,0.18); }
+    h1 { margin: 0; font-size: 18px; letter-spacing: 0.3px; font-weight: 700; display: flex; gap: 10px; align-items: center; }
+    h1 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+    .hud { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+    .pill { background: var(--panel); padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.18); display: inline-flex; align-items: center; gap: 8px; min-height: 34px; }
+    .life-heart { filter: drop-shadow(0 0 6px rgba(255,77,109,0.5)); }
+    .muted { color: var(--muted); font-weight: 500; }
+
+    .btn { appearance: none; border: 0; cursor: pointer; border-radius: 12px; padding: 9px 14px; font-weight: 700; letter-spacing: 0.2px; background: linear-gradient(180deg, #2a3142, #1f2534); color: white; border: 1px solid rgba(148,163,184,0.25); transition: transform 0.06s ease, box-shadow 0.2s ease; box-shadow: 0 6px 22px rgba(0,0,0,0.25); }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-ghost { background: transparent; border: 1px solid rgba(148,163,184,0.25); box-shadow: none; }
+
+    main { display: grid; place-items: center; padding: 12px 16px 6px; }
+
+    .board-wrap { width: min(980px, 94vw); aspect-ratio: 4 / 3; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)); border: 1px solid rgba(148,163,184,0.2); border-radius: 18px; box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06); position: relative; overflow: hidden; padding: 10px; }
+    #board { width: 100%; height: 100%; display: block; border-radius: 12px; background: radial-gradient(900px 500px at 50% 25%, #141a28 0%, var(--panel-2) 60%); }
+
+    .legend { position: absolute; right: 14px; top: 12px; display: grid; gap: 6px; text-align: right; font-size: 12px; }
+    .legend .row { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+    .legend .swatch { width: 12px; height: 3px; border-radius: 2px; background: var(--lane); box-shadow: var(--lane-glow); opacity: 0.9; }
+
+    #overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-weight: 900; font-size: clamp(24px, 5vw, 64px); color: white; text-align: center; opacity: 0; transition: opacity 220ms ease; background: radial-gradient(600px 380px at 50% 40%, rgba(255,77,109,0.06), rgba(0,0,0,0)); }
+    #overlay.show { opacity: 1; }
+
+    .toast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); background: rgba(20,24,32,0.9); border: 1px solid rgba(148,163,184,0.2); color: var(--ink); padding: 8px 12px; border-radius: 10px; font-size: 13px; }
+
+    /* SVG styling */
+    .lane { stroke-width: var(--lane-width); stroke-linecap: round; fill: none; stroke-opacity: 0.7; filter: drop-shadow(0 0 6px rgba(100,210,255,0.5)); }
+    .lane-guide { stroke-width: calc(var(--lane-width) + 10); stroke-linecap: round; stroke-dasharray: 6 10; fill: none; opacity: 0.35; }
+    .tray-emoji { font-size: 18px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
+
+    .cavity { font-size: 22px; opacity: 0.9; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }
+
+    .organ { cursor: grab; transition: transform 0.15s ease; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5)); }
+
+    /* Idle emojis are editable via CSS vars; rotation supported */
+    .organ-emoji { font-size: 34px; user-select: none; pointer-events: none; font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji", system-ui, sans-serif; transform: rotate(var(--rot, 0deg)) scale(var(--idle-scale, 3)); transform-origin: center; transform-box: fill-box; transition: transform 120ms ease; }
+    .organ.grabbing .organ-emoji { transform: rotate(var(--rot, 0deg)) scale(var(--grab-scale, 1)); }
+
+    .hit { animation: buzz 140ms ease-in-out 0s 1; }
+    @keyframes buzz { 0%{ transform: translateX(0); } 25%{ transform: translateX(-3px); } 50%{ transform: translateX(3px); } 75%{ transform: translateX(-2px); } 100%{ transform: translateX(0); }
+    }
+
+    footer { padding: 8px 16px 18px; text-align: center; color: var(--muted); font-size: 12px; }
+    a { color: var(--accent); text-decoration: none; }
+    .hitpad { pointer-events: all; }
+
+    /* ===== Main Menu screen & Modals ===== */
+    .screen { position: fixed; inset: 0; display: grid; place-items: center; background:
+      radial-gradient(1000px 600px at 50% -20%, rgba(255,255,255,0.06), rgba(0,0,0,0.25)); /* translucent so background image is visible */
+      z-index: 50; }
+    .menu-card, .modal-card { background: linear-gradient(180deg,#1b2130,#141820); border: 1px solid rgba(148,163,184,0.28); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06); padding: 22px; text-align: center; }
+    .menu-card { width: auto; max-width: min(92vw, 980px); display: inline-block; }
+    .menu-card h2, .modal-card h2 { margin: 0 0 6px; font-size: clamp(20px, 3.6vw, 28px); }
+    .menu-card p { margin: 8px 0 14px; color: var(--muted); }
+    .menu-actions, .modal-actions { display: flex; justify-content: center; gap: 12px; margin-top: 12px; }
+    /* Banner now dictates frame width; no fixed aspect ratio here */
+    .menu-banner { display: none; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.35); margin: 0 auto 12px; }
+
+    /* Menu floating volume at top-right */
+    .menu-vol { position: absolute; top: 14px; right: 18px; z-index: 65; }
+
+    .modal { position: fixed; inset: 0; display: none; place-items: center; z-index: 60; background: rgba(0,0,0,0.45); }
+    .modal.show { display: grid; }
+
+    /* Volume UI */
+    .volume { gap: 8px; }
+    .volume input[type="range"] { width: 160px; }
+    .volume .volume-value { min-width: 34px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .vol-inline { margin-top: 10px; display: flex; justify-content: center; }
+  </style>
+</head>
+<body>
+  <!-- Background image layer (menu only; toggled via JS) -->
+  <div id="pageBg" aria-hidden="true"></div>
+
+  <header>
+    <h1><span class="dot"></span> Doctor Bibber</h1>
+    <div class="hud">
+      <div class="pill" id="livesPill" aria-live="polite">
+        <span class="muted">Lives</span>
+        <span id="lives" style="display:inline-flex; gap:6px; align-items:center"></span>
+      </div>
+      <div class="pill" id="progressPill" aria-live="polite">
+        <span class="muted">Removed</span>
+        <strong id="progress">0/8</strong>
+      </div>
+      <!-- Global volume control (in-game) -->
+      <div class="pill volume" aria-label="Volume">
+        <span class="muted">Vol</span>
+        <input class="volume-slider" type="range" min="0" max="100" value="80" />
+        <span class="volume-value">80%</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="board-wrap">
+      <svg id="board" viewBox="0 0 800 600" role="img" aria-label="Operation-style game board with organs, lanes, and trays.">
+        <defs>
+          <radialGradient id="bodyGrad" cx="50%" cy="38%" r="60%">
+            <stop offset="0%" stop-color="#1a2232"/>
+            <stop offset="100%" stop-color="#121826"/>
+          </radialGradient>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        <image id="bodyImage" x="0" y="0" width="800" height="600" preserveAspectRatio="xMidYMid slice" opacity="0.85" style="display:none"></image>
+
+        <g id="body" opacity="0.85">
+          <path d="M400,60 c-60,0 -110,40 -130,100 c-12,35 -40,60 -60,90 c-24,36 -36,78 -36,122 c0,84 104,144 226,144 s226,-60 226,-144 c0,-44 -12,-86 -36,-122 c-20,-30 -48,-55 -60,-90 c-20,-60 -70,-100 -130,-100z" fill="url(#bodyGrad)" stroke="#2b3447" stroke-width="2"/>
+        </g>
+
+        <g id="lanes"></g>
+        <g id="trays"></g>
+        <g id="pockets"></g>
+        <g id="organs"></g>
+
+      </svg>
+      <div id="overlay" aria-live="polite"></div>  
+  </main>
+
+  <!-- ===== Main Menu Screen ===== -->
+  <section id="menuScreen" class="screen" aria-labelledby="menuTitle">
+    <!-- Floating volume (top-right of menu screen) -->
+    <div class="menu-vol">
+      <div class="pill volume" aria-label="Volume">
+        <span class="muted">Vol</span>
+        <input class="volume-slider" type="range" min="0" max="100" value="80" />
+        <span class="volume-value">80%</span>
+      </div>
+    </div>
+
+    <div class="menu-card" id="menuCard">
+      <img id="menuBanner" class="menu-banner" alt="" />
+      <h2 id="menuTitle">Doctor Bibber</h2>
+      <p>Guide each organ along its lane to the tray. Stay on the path — stray off and you lose a life.</p>
+      <div class="menu-actions">
+        <button id="playBtn" class="btn" type="button">Play</button>
+        <button id="menuCloseBtn" class="btn btn-ghost" type="button" title="Close (no action yet)">Close</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Win / Lose Modals ===== -->
+  <div id="winModal" class="modal" role="dialog" aria-labelledby="winTitle" aria-modal="true">
+    <div class="modal-card">
+      <h2 id="winTitle">You win! 🎉</h2>
+      <div class="modal-actions">
+        <button id="winAgainBtn" class="btn" type="button">Play Again</button>
+        <button id="winCloseBtn" class="btn btn-ghost" type="button" title="Close (no action yet)">Close</button>
+      </div>
+      <div class="vol-inline">
+        <div class="pill volume" aria-label="Volume">
+          <span class="muted">Vol</span>
+          <input class="volume-slider" type="range" min="0" max="100" value="80" />
+          <span class="volume-value">80%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loseModal" class="modal" role="dialog" aria-labelledby="loseTitle" aria-modal="true">
+    <div class="modal-card">
+      <h2 id="loseTitle">Game Over</h2>
+      <div class="modal-actions">
+        <button id="loseRestartBtn" class="btn" type="button">Restart</button>
+        <button id="loseCloseBtn" class="btn btn-ghost" type="button" title="Close (no action yet)">Close</button>
+      </div>
+      <div class="vol-inline">
+        <div class="pill volume" aria-label="Volume">
+          <span class="muted">Vol</span>
+          <input class="volume-slider" type="range" min="0" max="100" value="80" />
+          <span class="volume-value">80%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+    // ----- PORTALS functions
+function sendMessage(taskName, targetState) {
+        const message = {
+          TaskName: taskName,
+          TaskTargetState: targetState
+        };
+        PortalsSdk.sendMessageToUnity(JSON.stringify(message));
+      }
+
+function closeIframe() {
+        PortalsSdk.closeIframe();
+      }
+
+  // ======== OPERATION-STYLE GAME ==========
+  const GAME = { lives: 3, removed: 0, total: 8, active: false, allowExtra: 2 };
+  const COLLISION_WIDTH = 15; // px (full width)
+
+  // Theme URLs
+  const THEME = {
+    pageBackgroundUrl: "https://assetz.nyc3.cdn.digitaloceanspaces.com/Scapelz%20&%20Scandalz/menu-bg.jpg",
+    menuBannerUrl: "https://assetz.nyc3.cdn.digitaloceanspaces.com/Scapelz%20&%20Scandalz/title-banner.png",
+    menuBannerAlt: "Main menu banner"
+  };
+
+  // Audio settings
+  const SOUND = {
+    musicUrl: "https://assetz.nyc3.cdn.digitaloceanspaces.com/Scapelz%20&%20Scandalz/heartrate.mp3",
+    mistakeUrl: "https://assetz.nyc3.cdn.digitaloceanspaces.com/Scapelz%20&%20Scandalz/buzzer.mp3",
+    musicVolume: 0.35, // base music gain
+    sfxVolume: 0.9     // base sfx gain
+  };
+  const VOLUME = { master: 0.8 }; // user slider 0..1
+
+  const ORGANS = [
+    { id: 'heart',   label: 'HEART',   side: 'left',  startX: 419, startY: 225 },
+    { id: 'bone',    label: 'BONE',    side: 'left',  startX: 279, startY: 304 },
+    { id: 'brain',   label: 'BRAIN',   side: 'left',  startX: 352, startY: 291 },
+    { id: 'stomach', label: 'STOMACH', side: 'left',  startX: 400, startY: 326 },
+    { id: 'lung',    label: 'LUNG',    side: 'right', startX: 355, startY: 234 },
+    { id: 'kidney',  label: 'KIDNEY',  side: 'right', startX: 414, startY: 270 },
+    { id: 'tooth',   label: 'TOOTH',   side: 'right', startX: 509, startY: 308 },
+    { id: 'liver',   label: 'LIVER',   side: 'right', startX: 312, startY: 449 },
+  ];
+
+  const EMOJI = { heart:'💔', bone:'🦴', brain:'🔑', stomach:'🥄', lung:'🫁', kidney:'🫘', tooth:'🦴', liver:'🦴' };
+
+  const TRAY_X = { heart:75, bone:75, brain:75, stomach:75, lung:700, kidney:700, tooth:700, liver:700 };
+  const TRAY_Y = { heart:55, bone:392, brain:185, stomach:528, lung:55, kidney:185, tooth:528, liver:392 };
+
+  const AMP       = { heart:32, bone:23, brain:28, stomach:36, lung:34, kidney:30, tooth:26, liver:38 };
+  const MID_SHIFT = { heart:-18, bone:-27, brain:7, stomach:20, lung:14, kidney:-22, tooth:24, liver:-12 };
+  const SIGNS     = {
+    heart:[ -1, -1, -1],
+    bone: [ 1, 1, 1],
+    brain:[ -1, -1, -1],
+    stomach:[1,  1, -1],
+    lung: [  1, -1, -1],
+    kidney:[ 1, -1,  1],
+    tooth:[  1,  1,  1],
+    liver:[ -1, -1, -1],
+  };
+
+  const SCALES = {
+    heart:{ idle:1, grab:0.5, rot:0 }, bone:{ idle:1.2, grab:0.5, rot:-26 }, brain:{ idle:1, grab:0.5, rot:140 }, stomach:{ idle:1, grab:0.5, rot:-60 },
+    lung:{ idle:1, grab:0.5, rot:0 }, kidney:{ idle:1, grab:0.5, rot:0 }, tooth:{ idle:1.3, grab:0.5, rot:-66 }, liver:{ idle:1.2, grab:0.5, rot:-36 },
+  };
+
+  const BODY_IMAGE = { url: 'https://assetz.nyc3.cdn.digitaloceanspaces.com/Scapelz%20&%20Scandalz/dragonbody.png', fit: 'contain', opacity: 0.85 };
+
+  const svg = document.getElementById('board');
+  const bodyImg = document.getElementById('bodyImage');
+  const bodyGroup = document.getElementById('body');
+  const lanesG   = document.getElementById('lanes');
+  const traysG   = document.getElementById('trays');
+  const pocketsG = document.getElementById('pockets');
+  const organsG  = document.getElementById('organs');
+  const overlay  = document.getElementById('overlay');
+  const livesEl  = document.getElementById('lives');
+  const progressEl = document.getElementById('progress');
+  const pageBg = document.getElementById('pageBg');
+
+  // Menu UI refs
+  const menuScreen = document.getElementById('menuScreen');
+  const menuCard = document.getElementById('menuCard');
+  const menuBanner = document.getElementById('menuBanner');
+  const playBtn = document.getElementById('playBtn');
+  const menuCloseBtn = document.getElementById('menuCloseBtn');
+
+  // Modals
+  const winModal = document.getElementById('winModal');
+  const loseModal = document.getElementById('loseModal');
+  const winAgainBtn = document.getElementById('winAgainBtn');
+  const loseRestartBtn = document.getElementById('loseRestartBtn');
+  const winCloseBtn = document.getElementById('winCloseBtn');
+  const loseCloseBtn = document.getElementById('loseCloseBtn');
+
+  function el(name, attrs = {}, children = []) {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    for (const child of children) node.appendChild(child);
+    return node;
+  }
+
+  function setLives(n){
+    livesEl.innerHTML='';
+    for(let i=0;i<3;i++){
+      const span=document.createElement('span');
+      span.className='life-heart';
+      span.textContent= i<n?'❤':'♡';
+      span.style.fontSize='18px';
+      if(i>=n) span.style.color='rgba(255,255,255,0.35)';
+      livesEl.appendChild(span);
+    }
+  }
+
+  function updateProgress(){
+    progressEl.textContent = `${GAME.removed}/${GAME.total}`;
+    if(GAME.removed===GAME.total){ GAME.active=false; showWin(); }
+  }
+
+  function gameOver(){ GAME.active=false; showLose(); sendMessage("bibberactive", "SetActiveToNotActive"); }
+  function showWin(){ overlay.classList.remove('show'); winModal.classList.add('show'); sendMessage("bibberactive", "SetActiveToCompleted"); }
+  function showLose(){ overlay.classList.remove('show'); loseModal.classList.add('show'); }
+  function hideModals(){ winModal.classList.remove('show'); loseModal.classList.remove('show'); }
+
+  function buzzBoard(){ svg.classList.remove('hit'); void svg.offsetWidth; svg.classList.add('hit'); }
+
+  function layoutIfNeeded(){
+    const H=600; const minY=50, maxY=H-50; const gap=(maxY-minY)/(ORGANS.length-1);
+    ORGANS.forEach((o,i)=>{ if(o.startY==null||Number.isNaN(o.startY)) o.startY = Math.round(minY+i*gap); });
+    return gap;
+  }
+
+  const PATHS = {}; let BAND_GAP=0;
+  function makeWavyPath(o){
+    const start={ x:o.startX, y:o.startY };
+    const end  ={ x: TRAY_X[o.id], y: (TRAY_Y[o.id]??o.startY) };
+    const s = SIGNS[o.id]; let amp = AMP[o.id];
+    const half = COLLISION_WIDTH/2; const maxSafe = Math.max(8,(BAND_GAP/2)-half-8); amp=Math.min(amp,maxSafe);
+    const xm1 = o.side==='left'? start.x-160 : start.x+160;
+    const xm2 = (start.x+end.x)/2 + MID_SHIFT[o.id];
+    const xm3 = o.side==='left'? end.x+140 : end.x-140;
+    const cp1 = { x:xm1, y:start.y + s[0]*amp };
+    const mid = { x:xm2, y:start.y + s[1]*amp*0.9 };
+    const cp2 = { x:xm2 + (o.side==='left'?-50:50), y:start.y + s[1]*amp*-0.9 };
+    const cp3 = { x:xm3, y:start.y + s[2]*amp };
+    const d = `M ${start.x},${start.y} C ${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${mid.x},${mid.y} S ${cp3.x},${cp3.y} ${end.x},${end.y}`;
+    return { d, end };
+  }
+
+  function build(){
+    lanesG.innerHTML=''; traysG.innerHTML=''; pocketsG.innerHTML=''; organsG.innerHTML='';
+    BAND_GAP = layoutIfNeeded(); GAME.total = ORGANS.length;
+
+    ORGANS.forEach((o,idx)=>{
+      const { d, end } = makeWavyPath(o);
+      const color = ['#ef4444','#f59e0b','#10b981','#06b6d4','#8b5cf6','#e11d48','#22c55e','#f97316'][idx % 8];
+      const guide = el('path', { d, class:'lane-guide', stroke:color, 'stroke-opacity':'0.35' });
+      const lane  = el('path', { d, class:'lane', id:`lane-${o.id}`, stroke:color });
+      lanesG.appendChild(guide); lanesG.appendChild(lane);
+      PATHS[o.id] = { d, end, el: lane };
+
+      const trayGroup = el('g', { id:`tray-${o.id}`, 'data-id':o.id, transform:`translate(${end.x}, ${end.y}) scale(2.5)` });
+      const trayEmoji = el('text', { x:0, y:0, 'text-anchor':'middle', 'alignment-baseline':'middle', 'dominant-baseline':'central', class:'tray-emoji' }, [document.createTextNode('📥')]);
+      trayGroup.appendChild(trayEmoji); traysG.appendChild(trayGroup);
+    });
+
+    for(const o of ORGANS){
+      const g = el('g',{ class:'organ', id:`org-${o.id}`, 'data-id':o.id, transform:`translate(${o.startX}, ${o.startY})`, role:'button' });
+      const hit = el('circle',{ cx:0, cy:0, r:22, class:'hitpad', fill:'#000', 'fill-opacity':'0.001' });
+      const em  = el('text',{ x:0, y:0, 'text-anchor':'middle', 'alignment-baseline':'middle', 'dominant-baseline':'central', class:'organ-emoji' },[document.createTextNode(EMOJI[o.id]||'🔹')]);
+      const sc = SCALES[o.id]||{idle:3,grab:1,rot:0};
+      em.setAttribute('style', `--idle-scale:${sc.idle}; --grab-scale:${sc.grab}; --rot:${(sc.rot||0)}deg;`);
+      g.appendChild(hit); g.appendChild(em); organsG.appendChild(g);
+    }
+
+    setLives(GAME.lives); updateProgress(); renderBodyImage();
+  }
+
+  // ===== Audio engine =====
+  const AUDIO = { music:null, started:false };
+  let audioCtx = null; let sfxGainBase = 0.25;
+
+  function applyVolumes(){
+    const master = VOLUME.master;
+    if (AUDIO.music) AUDIO.music.volume = SOUND.musicVolume * master;
+    SOUND._sfxGain = (SOUND.sfxVolume * master);
+  }
+
+  function syncVolumeUI(){
+    const pct = Math.round(VOLUME.master*100);
+    document.querySelectorAll('.volume-slider').forEach(sl=>{ if(!sl.matches(':focus')) sl.value = String(pct); });
+    document.querySelectorAll('.volume-value').forEach(sp=> sp.textContent = pct + '%');
+  }
+
+  function setMasterVolume(v){ VOLUME.master = Math.max(0, Math.min(1, v)); applyVolumes(); syncVolumeUI(); }
+
+  function ensureAudioStarted(){
+    if (AUDIO.started) return; AUDIO.started = true;
+    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume?.(); } catch(_){ }
+    const url = (SOUND.musicUrl||'').trim();
+    if (url) {
+      const a = new Audio(url); a.loop = true; AUDIO.music = a; applyVolumes(); a.play().catch(err=>console.warn('Music play blocked:', err));
+    }
+  }
+
+  function playMistakeSfx(){
+    const url = (SOUND.mistakeUrl||'').trim();
+    if (url) { try { const a = new Audio(url); a.volume = SOUND._sfxGain ?? (SOUND.sfxVolume*VOLUME.master); a.play(); } catch(_){} return; }
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      o.type = 'square'; o.frequency.setValueAtTime(320, audioCtx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(160, audioCtx.currentTime + 0.18);
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(sfxGainBase*(VOLUME.master||0.0001), audioCtx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+      o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.22);
+    } catch(_){}
+  }
+
+  // ===== Background + menu toggling =====
+  function setMenuBackgroundVisible(show){
+    if (show) {
+      const bg = (THEME.pageBackgroundUrl||'').trim();
+      if (bg) pageBg.style.backgroundImage = `url("${bg}")`;
+      pageBg.style.display = 'block';
+    } else {
+      pageBg.style.display = 'none';
+    }
+  }
+
+  function openMainMenu(){
+    hideModals();
+    GAME.active = false;
+    document.body.classList.add('menu-open');
+    menuScreen.style.display = 'grid';
+    setMenuBackgroundVisible(true);
+  }
+
+  // Collision corridor helper (independent of CSS lane width)
+  function getLaneHalfWidth(){ return COLLISION_WIDTH / 2; }
+
+  function isOnLane(id,x,y){
+    const lane=PATHS[id]?.el; if(!lane) return false; const half=getLaneHalfWidth();
+    const len=lane.getTotalLength(); const steps=Math.max(100,Math.floor(len/5));
+    for(let i=0;i<=steps;i++){ const p=lane.getPointAtLength((i/steps)*len); const dx=p.x-x, dy=p.y-y; if(dx*dx+dy*dy<=half*half) return true; }
+    return false;
+  }
+
+  function clientToSvgPoint(clientX,clientY){ const pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY; const inv=svg.getScreenCTM().inverse(); return pt.matrixTransform(inv); }
+
+  function renderBodyImage(){
+    const has = !!(BODY_IMAGE.url && BODY_IMAGE.url.trim());
+    if(has){ const url = BODY_IMAGE.url.trim(); bodyImg.setAttribute('href', url); try { bodyImg.setAttributeNS('http://www.w3.org/1999/xlink','href', url); } catch(_){}
+      bodyImg.setAttribute('opacity', String(BODY_IMAGE.opacity)); bodyImg.setAttribute('preserveAspectRatio', BODY_IMAGE.fit==='cover' ? 'xMidYMid slice' : 'xMidYMid meet');
+      bodyImg.style.display = 'block'; bodyGroup.style.display = 'none';
+    } else { bodyImg.style.display = 'none'; bodyGroup.style.display = ''; }
+  }
+
+  function applyTheme(){
+    // Background is toggled by setMenuBackgroundVisible(); only set banner here
+    const bUrl = (THEME.menuBannerUrl||'').trim();
+    if (bUrl) { menuBanner.src = bUrl; menuBanner.alt = THEME.menuBannerAlt || 'Main menu banner'; menuBanner.style.display = 'block'; }
+    else { menuBanner.removeAttribute('src'); menuBanner.style.display = 'none'; }
+  }
+
+  // Make the menu frame (card) fit the banner width
+  function sizeMenuToBanner(){
+    if (!menuBanner || !menuBanner.complete || !menuBanner.naturalWidth) return;
+    const max = Math.min(window.innerWidth*0.92, 980);
+    const w = Math.min(menuBanner.naturalWidth, max);
+    menuCard.style.width = w + 'px';
+  }
+
+  let drag=null;
+  function onPointerDown(e){ if(!GAME.active) return; const organ = e.target.closest('.organ'); if(!organ) return; const id=organ.getAttribute('data-id'); drag={ organId:id, el:organ }; organ.classList.add('grabbing'); organ.setPointerCapture?.(e.pointerId); e.preventDefault(); }
+  function onPointerMove(e){ if(!drag || !GAME.active) return; const pt=clientToSvgPoint(e.clientX,e.clientY); const x=pt.x, y=pt.y; drag.el.setAttribute('transform',`translate(${x}, ${y})`); if(!isOnLane(drag.organId,x,y)){ loseLifeAndReset(drag.organId); return; } const end=PATHS[drag.organId].end; const dx=x-end.x, dy=y-end.y; if(dx*dx+dy*dy<18*18){ completeOrgan(drag.organId); } }
+  function onPointerUp(){ if(!drag) return; const id=drag.organId; const organ=ORGANS.find(x=>x.id===id); if(organ){ drag.el.classList.remove('grabbing'); drag.el.setAttribute('transform',`translate(${organ.startX}, ${organ.startY})`); } drag=null; }
+
+  function loseLifeAndReset(id){ if(!GAME.active) return; GAME.lives-=1; setLives(GAME.lives); buzzBoard(); playMistakeSfx(); const organ=ORGANS.find(x=>x.id===id); const g=document.getElementById(`org-${id}`); if(organ && g){ g.classList.remove('grabbing'); g.setAttribute('transform',`translate(${organ.startX}, ${organ.startY})`); } drag=null; if(GAME.lives<=0){ gameOver(); } }
+  function completeOrgan(id){ const g=document.getElementById(`org-${id}`); if(!g) return; g.classList.remove('grabbing'); g.style.transition='opacity 220ms ease, transform 200ms ease'; const end=PATHS[id].end; g.setAttribute('transform',`translate(${end.x}, ${end.y})`); g.style.opacity='0'; g.style.pointerEvents='none'; GAME.removed+=1; updateProgress(); drag=null; }
+
+  function startGame(){
+    sendMessage("bibberactive", "SetNotActiveToActive");
+    hideModals();
+    menuScreen.style.display='none';
+    document.body.classList.remove('menu-open');
+    setMenuBackgroundVisible(false);
+    reset();
+  }
+  function reset(){ GAME.lives=3; GAME.removed=0; GAME.active=true; overlay.classList.remove('show'); overlay.textContent=''; hideModals(); build(); }
+
+  // Pointer listeners
+  svg.addEventListener('pointerdown', onPointerDown); svg.addEventListener('pointermove', onPointerMove); svg.addEventListener('pointerup', onPointerUp); svg.addEventListener('pointercancel', onPointerUp);
+
+  // Start music on first interaction
+  window.addEventListener('pointerdown', ensureAudioStarted, { once:true, capture:true });
+  window.addEventListener('keydown', ensureAudioStarted, { once:true, capture:true });
+
+  // Volume controls (all screens)
+  document.addEventListener('input', (e)=>{ if(e.target && e.target.classList.contains('volume-slider')){ setMasterVolume((+e.target.value||0)/100); } });
+
+  
+
+  // Menu & modal buttons
+  playBtn.addEventListener('click', ()=>{ ensureAudioStarted(); startGame(); });
+  winAgainBtn.addEventListener('click', ()=>{ winModal.classList.remove('show'); reset(); });
+  loseRestartBtn.addEventListener('click', ()=>{ loseModal.classList.remove('show'); reset(); });
+  const noop = (label)=>()=>console.log(label + ' clicked (no action wired)');
+  menuCloseBtn.addEventListener('click', noop('Menu Close')); winCloseBtn.addEventListener('click', noop('Win Close')); loseCloseBtn.addEventListener('click', noop('Lose Close'));
+
+  // Tests
+  function runTests(){
+    const results = []; const assert=(n,c)=>{console.assert(c,n);results.push({n,pass:!!c});};
+    THEME.pageBackgroundUrl = 'https://picsum.photos/1600/900?blur=2'; THEME.menuBannerUrl = 'https://picsum.photos/900/300'; applyTheme();
+    // Menu shows background and hides game UI
+    openMainMenu();
+    assert('Menu background visible', getComputedStyle(pageBg).display !== 'none');
+    assert('Game UI hidden when menu open', getComputedStyle(document.querySelector('main')).display === 'none');
+    // Start game hides background and shows game UI
+    startGame();
+    assert('Game background hidden', getComputedStyle(pageBg).display === 'none');
+    assert('Game UI visible during play', getComputedStyle(document.querySelector('main')).display !== 'none');
+    // Volume sliders exist on header, menu, and both modals (>=3)
+    assert('Volume sliders rendered', document.querySelectorAll('.volume-slider').length >= 3);
+    // Volume change sync
+    setMasterVolume(0.42); const pct = [...document.querySelectorAll('.volume-slider')].every(sl=>+sl.value===42);
+    assert('Volume UI syncs across sliders', pct);
+    console.group('%cDoctor Bibber — tests', 'color:#64d2ff'); results.forEach(r=>console.log(`${r.pass?'✅':'❌'} ${r.n}`)); console.groupEnd();
+  }
+  (function maybeRunTests(){ const params = new URLSearchParams(location.search); if (params.get('test') === '1' || location.hash.includes('test')) runTests(); })();
+
+  try{
+    build(); applyTheme(); syncVolumeUI();
+    menuBanner.addEventListener('load', sizeMenuToBanner); window.addEventListener('resize', sizeMenuToBanner);
+    // open main menu on load (with background) and hide game UI
+    openMainMenu();
+  }catch(err){ console.error(err); overlay.textContent='Init error: '+err.message; overlay.classList.add('show'); }
+  </script>
+</body>
+</html>
